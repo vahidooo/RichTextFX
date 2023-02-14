@@ -96,9 +96,9 @@ class ParagraphBox<PS, SEG, S> extends Region {
                  Function<StyledSegment<SEG, S>, Node> nodeFactory) {
         this.getStyleClass().add("paragraph-box");
         this.text = new ParagraphText<>(par, nodeFactory);
-        applyParagraphStyle.accept(this.text, par.getParagraphStyle());
+        applyParagraphStyle.accept(this.text.getTextFlow(), par.getParagraphStyle());
         isFolded = Val.wrap( text.visibleProperty().not() );
-        
+
         // start at -1 so that the first time it is displayed, the caret at pos 0 is not
         // accidentally removed from its parent and moved to this node's ParagraphText
         // before this node gets updated to its real index and therefore removes
@@ -138,7 +138,7 @@ class ParagraphBox<PS, SEG, S> extends Region {
     Paragraph<PS, SEG, S> getParagraph() {
         return text.getParagraph();
     }
-    
+
     Node getGraphic() {
         if(graphic.isPresent()) {
             return graphic.getValue();
@@ -170,7 +170,7 @@ class ParagraphBox<PS, SEG, S> extends Region {
         Point2D onScreen = this.localToScreen(x, y);
         Point2D inText = text.screenToLocal(onScreen);
         Insets textInsets = text.getInsets();
-        return text.hit(inText.getX() - textInsets.getLeft(), inText.getY() - textInsets.getTop());
+        return text.getTextFlow().hit(inText.getX() - textInsets.getLeft(), inText.getY() - textInsets.getTop());
     }
 
     public <T extends Node & Caret> CaretOffsetX getCaretOffsetX(T caret) {
@@ -190,7 +190,7 @@ class ParagraphBox<PS, SEG, S> extends Region {
 
     public int getLineCount() {
         layout(); // ensure layout, is a no-op if not dirty
-        return text.getLineCount();
+        return text.getTextFlow().getLineCount();
     }
 
     public int getCurrentLineIndex(Caret caret) {
@@ -243,7 +243,7 @@ class ParagraphBox<PS, SEG, S> extends Region {
         if ( ! wrapText.get() ) width = Double.MAX_VALUE;
         Insets insets = getInsets();
         double overhead = getGraphicPrefWidth() + insets.getLeft() + insets.getRight();
-        return text.prefHeight(width - overhead) + insets.getTop() + insets.getBottom() + text.getLineSpacing();
+        return text.prefHeight(width - overhead) + insets.getTop() + insets.getBottom() + text.getTextFlow().getLineSpacing();
     }
 
     @Override
@@ -253,7 +253,7 @@ class ParagraphBox<PS, SEG, S> extends Region {
         double graphicWidth = getGraphicPrefWidth();
 
         if ( wrapText.get() ) {
-            double half = text.getLineSpacing() / 2.0;
+            double half = text.getTextFlow().getLineSpacing() / 2.0;
             double w = getWidth() - ins.getLeft() - ins.getRight();
             text.resizeRelocate(graphicWidth + ins.getLeft(), ins.getTop() + half, w - graphicWidth, h - half);
         } else {
@@ -280,7 +280,7 @@ class ParagraphBox<PS, SEG, S> extends Region {
      * @return hit info for the given line and x coordinate
      */
     CharacterHit hitTextLine(CaretOffsetX x, int line) {
-        return text.hitLine(x.value, line);
+        return text.getTextFlow().hitLine(x.value, line);
     }
 
     /**
@@ -289,6 +289,6 @@ class ParagraphBox<PS, SEG, S> extends Region {
      * @return hit info for the given x and y coordinates
      */
     CharacterHit hitText(CaretOffsetX x, double y) {
-        return text.hit(x.value, y);
+        return text.getTextFlow().hit(x.value, y);
     }
 }

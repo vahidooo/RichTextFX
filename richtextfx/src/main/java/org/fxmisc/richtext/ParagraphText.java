@@ -31,8 +31,10 @@ import javafx.collections.ObservableSet;
 import javafx.collections.SetChangeListener;
 import javafx.geometry.Bounds;
 import javafx.geometry.Insets;
+import javafx.geometry.NodeOrientation;
 import javafx.scene.Node;
 import javafx.scene.control.IndexRange;
+import javafx.scene.layout.Region;
 import javafx.scene.paint.Color;
 import javafx.scene.paint.Paint;
 import javafx.scene.shape.LineTo;
@@ -43,14 +45,14 @@ import javafx.scene.shape.StrokeLineCap;
 import javafx.scene.shape.StrokeType;
 
 /**
- * The class responsible for rendering the segments in an paragraph. It also renders additional RichTextFX-specific
+ * The class responsible for rendering the segments in a paragraph. It also renders additional RichTextFX-specific
  * CSS found in {@link TextExt} as well as the selection and caret shapes.
  *
  * @param <PS> paragraph style type
  * @param <SEG> segment type
  * @param <S> segment style type
  */
-class ParagraphText<PS, SEG, S> extends TextFlowExt {
+class ParagraphText<PS, SEG, S> extends Region {
 
     private final ObservableSet<CaretNode> carets = FXCollections.observableSet(new HashSet<>(1));
     public final ObservableSet<CaretNode> caretsProperty() { return carets; }
@@ -72,6 +74,8 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
 
     private Paragraph<PS, SEG, S> paragraph;
 
+    private TextFlowExt textFlow;
+
     private final CustomCssShapeHelper<Paint> backgroundShapeHelper;
     private final CustomCssShapeHelper<BorderAttributes> borderShapeHelper;
     private final CustomCssShapeHelper<UnderlineAttributes> underlineShapeHelper;
@@ -89,11 +93,17 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
 
     ParagraphText(Paragraph<PS, SEG, S> par, Function<StyledSegment<SEG, S>, Node> nodeFactory) {
         this.paragraph = par;
+        textFlow = new TextFlowExt();
 
         getStyleClass().add("paragraph-text");
 
-        Val<Double> leftInset = Val.map(insetsProperty(), Insets::getLeft);
-        Val<Double> topInset = Val.map(insetsProperty(), Insets::getTop);
+        Val<Double> horizontalInset;
+        if (getEffectiveNodeOrientation() == NodeOrientation.LEFT_TO_RIGHT)
+            horizontalInset = Val.map(textFlow.insetsProperty(), Insets::getLeft);
+        else
+            horizontalInset = Val.map(textFlow.insetsProperty(), Insets::getRight);
+
+        Val<Double> topInset = Val.map(textFlow.insetsProperty(), Insets::getTop);
 
         ChangeListener<IndexRange> selectionRangeListener = (obs, ov, nv) -> requestLayout();
         selectionPathListener = change -> {
@@ -108,14 +118,14 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
             if (change.wasAdded()) {
                 SelectionPath p = change.getValueAdded();
                 p.rangeProperty().addListener(selectionRangeListener);
-                p.layoutXProperty().bind(leftInset);
+                p.layoutXProperty().bind(horizontalInset);
                 p.layoutYProperty().bind(topInset);
 
                 getChildren().add(selectionShapeStartIndex, p);
                 updateSingleSelection(p);
             }
         };
-        selections.addListener( selectionPathListener );
+        selections.addListener(selectionPathListener);
 
         ChangeListener<Integer> caretPositionListener = (obs, ov, nv) -> requestLayout();
         caretNodeListener = change -> {
@@ -130,14 +140,14 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
             if (change.wasAdded()) {
                 CaretNode caret = change.getElementAdded();
                 caret.columnPositionProperty().addListener(caretPositionListener);
-                caret.layoutXProperty().bind(leftInset);
+                caret.layoutXProperty().bind(horizontalInset);
                 caret.layoutYProperty().bind(topInset);
 
                 getChildren().add(caret);
                 updateSingleCaret(caret);
             }
         };
-        carets.addListener( caretNodeListener );
+        carets.addListener(caretNodeListener);
 
         // XXX: see the note at highlightTextFill
 //        highlightTextFill.addListener(new ChangeListener<Paint>() {
@@ -149,6 +159,8 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
 //            }
 //        });
 
+        getChildren().add(textFlow);
+
         // populate with text nodes
         par.getStyledSegments().stream().map(nodeFactory).forEach(n -> {
             if (n instanceof TextExt) {
@@ -157,13 +169,13 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
                 // see the note at highlightTextFill
                 t.selectionFillProperty().bind(t.fillProperty());
             }
-            getChildren().add(n);
+            textFlow.getChildren().add(n);
         });
 
         // set up custom css shape helpers
         UnaryOperator<Path> configurePath = shape -> {
             shape.setManaged(false);
-            shape.layoutXProperty().bind(leftInset);
+            shape.layoutXProperty().bind(horizontalInset);
             shape.layoutYProperty().bind(topInset);
             return shape;
         };
@@ -181,7 +193,7 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
                 (backgroundShape, tuple) -> {
                     backgroundShape.setStrokeWidth(0);
                     backgroundShape.setFill(tuple._1);
-                    backgroundShape.getElements().setAll(getRangeShape(tuple._2));
+                    backgroundShape.getElements().setAll(textFlow.getRangeShape(tuple._2));
                 },
                 addToBackgroundAndIncrementSelectionIndex,
                 clearUnusedShapes
@@ -198,7 +210,7 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
                     if (attributes.dashArray != null) {
                         borderShape.getStrokeDashArray().setAll(attributes.dashArray);
                     }
-                    borderShape.getElements().setAll(getRangeShape(tuple._2));
+                    borderShape.getElements().setAll(textFlow.getRangeShape(tuple._2));
                 },
                 addToBackground,
                 clearUnusedShapes
@@ -213,8 +225,8 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
                     if (attributes.dashArray != null) {
                         underlineShape.getStrokeDashArray().setAll(attributes.dashArray);
                     }
-                    PathElement[] shape = getUnderlineShape(tuple._2.getStart(), tuple._2.getEnd(),
-                                                            attributes.offset, attributes.waveRadius);
+                    PathElement[] shape = textFlow.getUnderlineShape(tuple._2.getStart(), tuple._2.getEnd(),
+                            attributes.offset, attributes.waveRadius);
                     underlineShape.getElements().setAll(shape);
                 },
                 addToForeground,
@@ -230,10 +242,10 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
         selections.removeListener( selectionPathListener );
         carets.removeListener( caretNodeListener );
 
-        getChildren().stream().filter( n -> n instanceof TextExt ).map( n -> (TextExt) n )
-        .forEach( t -> t.selectionFillProperty().unbind() ); 
+        textFlow.getChildren().stream().filter( n -> n instanceof TextExt ).map( n -> (TextExt) n )
+        .forEach( t -> t.selectionFillProperty().unbind() );
 
-        getChildren().clear();
+        textFlow.getChildren().clear();
     }
 
     public Paragraph<PS, SEG, S> getParagraph() {
@@ -293,19 +305,19 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
     }
 
     public int getCurrentLineStartPosition(Caret caret) {
-        return getLineStartPosition(getClampedCaretPosition(caret));
+        return textFlow.getLineStartPosition(getClampedCaretPosition(caret));
     }
 
     public int getCurrentLineEndPosition(Caret caret) {
-        return getLineEndPosition(getClampedCaretPosition(caret));
+        return textFlow.getLineEndPosition(getClampedCaretPosition(caret));
     }
 
     public int currentLineIndex(Caret caret) {
-        return getLineOfCharacter(getClampedCaretPosition(caret));
+        return textFlow.getLineOfCharacter(getClampedCaretPosition(caret));
     }
 
     public int currentLineIndex(int position) {
-        return getLineOfCharacter(position);
+        return textFlow.getLineOfCharacter(position);
     }
 
     private <T extends Node> void checkWithinParagraph(T shape) {
@@ -325,7 +337,7 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
     }
 
     private void updateSingleCaret(CaretNode caretNode) {
-        PathElement[] shape = getCaretShape(getClampedCaretPosition(caretNode), true);
+        PathElement[] shape = textFlow.getCaretShape(getClampedCaretPosition(caretNode), true);
         caretNode.getElements().setAll(shape);
     }
 
@@ -353,7 +365,7 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
         PathElement[] shape;
         if (end <= paragraph.length()) {
             // selection w/o newline char
-            shape = getRangeShape(start, end);
+            shape = textFlow.getRangeShape(start, end);
         } else {
             // Selection includes a newline character.
             double width = getWidth() - getInsets().getRight() - getInsets().getLeft();
@@ -364,11 +376,11 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
                 // selecting only the newline char
 
                 // calculate the bounds of the last character
-                shape = getRangeShape(start - 1, start);
+                shape = textFlow.getRangeShape(start - 1, start);
                 LineTo lineToTopRight = (LineTo) shape[shape.length - 4];
                 shape = createRectangle(lineToTopRight.getX(), lineToTopRight.getY(), width, getHeight());
             } else {
-                shape = getRangeShape(start, paragraph.length());
+                shape = textFlow.getRangeShape(start, paragraph.length());
                 // Since this might be a wrapped multi-line paragraph,
                 // there may be multiple groups of (1 MoveTo, 4 LineTo objects) for each line:
                 // MoveTo(topLeft), LineTo(topRight), LineTo(bottomRight), LineTo(bottomLeft)
@@ -392,8 +404,8 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
             }
         }
 
-        if ( getLineSpacing() > 0 ) {
-            double half = getLineSpacing() / 2.0;
+        if ( textFlow.getLineSpacing() > 0 ) {
+            double half = textFlow.getLineSpacing() / 2.0;
             for ( int g = 0; g < shape.length; g += 5 ) {
                 MoveTo tl = (MoveTo) shape[g];
                 tl.setY( tl.getY()-half );
@@ -408,10 +420,10 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
             }
         }
 
-        if (getLineCount() > 1) {
+        if (textFlow.getLineCount() > 1) {
             // adjust right corners of wrapped lines
             double width = getWidth() - getInsets().getRight() - getInsets().getLeft();
-            boolean wrappedAtEndPos = (end > 0 && getLineOfCharacter(end) > getLineOfCharacter(end - 1));
+            boolean wrappedAtEndPos = (end > 0 && textFlow.getLineOfCharacter(end) > textFlow.getLineOfCharacter(end - 1));
             int adjustLength = shape.length - (wrappedAtEndPos ? 0 : 5);
             for (int i = 0; i < adjustLength; i++) {
                 if (shape[i] instanceof MoveTo) {
@@ -484,6 +496,10 @@ class ParagraphText<PS, SEG, S> extends TextFlowExt {
         updateAllCaretShapes();
         updateAllSelectionShapes();
         updateBackgroundShapes();
+    }
+
+    public TextFlowExt getTextFlow() {
+        return textFlow;
     }
 
     private static class CustomCssShapeHelper<T> {

@@ -236,7 +236,7 @@ class TextStyle {
         }
 
         if(fontFamily.isPresent()) {
-            sb.append("-fx-font-family: " + fontFamily.get() + ";");
+            sb.append("-fx-font-family: '" + fontFamily.get() + "';");
         }
 
         if(textColor.isPresent()) {

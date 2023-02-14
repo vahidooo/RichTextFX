@@ -24,6 +24,7 @@ import java.util.function.UnaryOperator;
 import javafx.application.Application;
 import javafx.beans.binding.BooleanBinding;
 import javafx.collections.FXCollections;
+import javafx.geometry.NodeOrientation;
 import javafx.geometry.Orientation;
 import javafx.scene.Node;
 import javafx.scene.Scene;
@@ -168,6 +169,7 @@ public class RichTextDemo extends Application {
     }
 
     {
+        area.setNodeOrientation(NodeOrientation.RIGHT_TO_LEFT);
         area.setWrapText(true);
         area.setStyleCodecs(
                 ParStyle.CODEC,

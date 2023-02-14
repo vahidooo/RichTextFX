@@ -12,6 +12,7 @@ import java.util.function.Predicate;
 
 import javafx.event.Event;
 import javafx.geometry.Bounds;
+import javafx.geometry.NodeOrientation;
 import javafx.geometry.Point2D;
 import javafx.scene.control.ContextMenu;
 import javafx.scene.control.IndexRange;
@@ -53,7 +54,7 @@ class GenericStyledAreaBehavior {
 
         /*
          * KeyCodes are misinterpreted when using a different keyboard layout, for example:
-         * on Dvorak: C results in KeyCode I, X -> B, and V -> . 
+         * on Dvorak: C results in KeyCode I, X -> B, and V -> .
          * and on German layouts: Z and Y are reportedly switched
          * so then editing commands such as Ctrl+C, or CMD+Z are incorrectly processed.
          * KeyCharacterCombination however does keyboard translation before matching.
@@ -180,7 +181,7 @@ class GenericStyledAreaBehavior {
                 //Note that this is how several IDEs such JetBrains IDEs or Eclipse behave.
                 if (e.isControlDown() && e.isAltDown() && !e.isMetaDown() && e.getCharacter().length() == 1
                 	    && e.getCharacter().getBytes()[0] != 0) return true;
-                
+
                 return !e.isControlDown() && !e.isAltDown() && !e.isMetaDown();
             }
         	return !e.isControlDown() && !e.isMetaDown();
@@ -394,28 +395,50 @@ class GenericStyledAreaBehavior {
 
     private void left(KeyEvent ignore) {
         IndexRange sel = view.getSelection();
-        if(sel.getLength() == 0) {
-            view.previousChar(SelectionPolicy.CLEAR);
+        if (view.getEffectiveNodeOrientation() == NodeOrientation.RIGHT_TO_LEFT) {
+            if (sel.getLength() == 0) {
+                view.nextChar(SelectionPolicy.CLEAR);
+            } else {
+                view.moveTo(sel.getEnd(), SelectionPolicy.CLEAR);
+            }
         } else {
-            view.moveTo(sel.getStart(), SelectionPolicy.CLEAR);
+            if (sel.getLength() == 0) {
+                view.previousChar(SelectionPolicy.CLEAR);
+            } else {
+                view.moveTo(sel.getStart(), SelectionPolicy.CLEAR);
+            }
         }
     }
 
     private void right(KeyEvent ignore) {
         IndexRange sel = view.getSelection();
-        if(sel.getLength() == 0) {
-            view.nextChar(SelectionPolicy.CLEAR);
+        if (view.getEffectiveNodeOrientation() == NodeOrientation.RIGHT_TO_LEFT) {
+            if (sel.getLength() == 0) {
+                view.previousChar(SelectionPolicy.CLEAR);
+            } else {
+                view.moveTo(sel.getStart(), SelectionPolicy.CLEAR);
+            }
         } else {
-            view.moveTo(sel.getEnd(), SelectionPolicy.CLEAR);
+            if (sel.getLength() == 0) {
+                view.nextChar(SelectionPolicy.CLEAR);
+            } else {
+                view.moveTo(sel.getEnd(), SelectionPolicy.CLEAR);
+            }
         }
     }
 
     private void selectLeft(KeyEvent ignore) {
-        view.previousChar(SelectionPolicy.ADJUST);
+        if (view.getEffectiveNodeOrientation() == NodeOrientation.RIGHT_TO_LEFT)
+            view.nextChar(SelectionPolicy.ADJUST);
+        else
+            view.previousChar(SelectionPolicy.ADJUST);
     }
 
     private void selectRight(KeyEvent ignore) {
-        view.nextChar(SelectionPolicy.ADJUST);
+        if (view.getEffectiveNodeOrientation() == NodeOrientation.RIGHT_TO_LEFT)
+            view.previousChar(SelectionPolicy.ADJUST);
+        else
+            view.nextChar(SelectionPolicy.ADJUST);
     }
 
     private void deletePrevWord(KeyEvent ignore) {
