@@ -94,6 +94,8 @@ class ParagraphText<PS, SEG, S> extends Region {
     ParagraphText(Paragraph<PS, SEG, S> par, Function<StyledSegment<SEG, S>, Node> nodeFactory) {
         this.paragraph = par;
         textFlow = new TextFlowExt();
+        textFlow.prefHeightProperty().bind( heightProperty() );
+        textFlow.prefWidthProperty().bind( widthProperty() );
 
         getStyleClass().add("paragraph-text");
 
